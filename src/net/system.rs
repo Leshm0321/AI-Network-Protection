@@ -376,7 +376,7 @@ async fn collect_unix_snapshot() -> SystemSnapshot {
     }
 
     if snap.dns_servers.is_empty() {
-        if let Ok(content) = tokio::fs::read_to_string("/etc/resolv.conf").await {
+        if let Ok(content) = std::fs::read_to_string("/etc/resolv.conf") {
             let servers: Vec<String> = content
                 .lines()
                 .filter_map(|line| {
