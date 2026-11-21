@@ -37,14 +37,16 @@ jobs:
           cargo build --release
           mkdir -p "dist/AI-Network-Protection.app/Contents/MacOS" "dist/AI-Network-Protection.app/Contents/Resources"
           cp target/release/AI-Network-Protection "dist/AI-Network-Protection.app/Contents/MacOS/AI-Network-Protection"
+          cp assets/icon.png "dist/AI-Network-Protection.app/Contents/Resources/icon.png"
           # Generate macOS .icns from assets/icon.png using Apple iconutil + sips
           mkdir -p AppIcon.iconset
           for sz in 16 32 128 256 512; do
-            sips -z $sz $sz assets/icon.png --out AppIcon.iconset/icon_${sz}x${sz}.png
+            sips -s format png -z $sz $sz assets/icon.png --out AppIcon.iconset/icon_${sz}x${sz}.png
             sz2=$((sz * 2))
-            sips -z $sz2 $sz2 assets/icon.png --out AppIcon.iconset/icon_${sz}x${sz}@2x.png
+            sips -s format png -z $sz2 $sz2 assets/icon.png --out AppIcon.iconset/icon_${sz}x${sz}@2x.png
           done
           iconutil -c icns AppIcon.iconset -o "dist/AI-Network-Protection.app/Contents/Resources/AppIcon.icns"
+          test -s "dist/AI-Network-Protection.app/Contents/Resources/AppIcon.icns"
           cat > "dist/AI-Network-Protection.app/Contents/Info.plist" << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

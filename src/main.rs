@@ -216,6 +216,10 @@ fn resolve_sidecar_icon(filename: &str) -> Option<std::path::PathBuf> {
             if next_to_exe.is_file() {
                 return Some(next_to_exe);
             }
+            let mac_bundle_res = dir.join("..").join("Resources").join(filename);
+            if mac_bundle_res.is_file() {
+                return Some(mac_bundle_res);
+            }
             let dev_assets = dir.join("..").join("..").join("assets").join(filename);
             if dev_assets.is_file() {
                 return Some(dev_assets);
