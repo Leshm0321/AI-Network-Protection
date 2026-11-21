@@ -1,0 +1,70 @@
+name: Build Windows & macOS Desktop Apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run tests
+        run: cargo test
+      - name: Build Windows Release (.exe)
+        run: cargo build --release
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Network-Protection-windows-x64
+          path: target/release/AI-Network-Protection.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install NSH CLI
+        run: curl -fsSL https://nsh.dev/install.sh | sh
+      - name: Run tests
+        run: cargo test
+      - name: Build macOS Release Binary & .app Bundle
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cargo build --release
+          mkdir -p "dist/AI-Network-Protection.app/Contents/MacOS" "dist/AI-Network-Protection.app/Contents/Resources"
+          cp target/release/AI-Network-Protection "dist/AI-Network-Protection.app/Contents/MacOS/AI-Network-Protection"
+          # Generate macOS .icns from assets/icon.png using Apple iconutil + sips
+          mkdir -p AppIcon.iconset
+          for sz in 16 32 128 256 512; do
+            sips -z $sz $sz assets/icon.png --out AppIcon.iconset/icon_${sz}x${sz}.png
+            sz2=$((sz * 2))
+            sips -z $sz2 $sz2 assets/icon.png --out AppIcon.iconset/icon_${sz}x${sz}@2x.png
+          done
+          iconutil -c icns AppIcon.iconset -o "dist/AI-Network-Protection.app/Contents/Resources/AppIcon.icns"
+          cat > "dist/AI-Network-Protection.app/Contents/Info.plist" << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key><string>AI-Network-Protection</string>
+            <key>CFBundleIdentifier</key><string>dev.ai.network.protection</string>
+            <key>CFBundleName</key><string>AI-Network-Protection</string>
+            <key>CFBundleDisplayName</key><string>AI-Network-Protection</string>
+            <key>CFBundleVersion</key><string>0.1.0</string>
+            <key>CFBundleShortVersionString</key><string>0.1.0</string>
+            <key>CFBundleIconFile</key><string>AppIcon</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
+          cd dist && zip -r ../AI-Network-Protection-macos-arm64.zip "AI-Network-Protection.app"
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Network-Protection-macos-arm64
+          path: AI-Network-Protection-macos-arm64.zip

@@ -1,0 +1,18 @@
+{
+  "name": "AI-Network-Protection",
+  "id": "dev.ai.network.protection",
+  "version": "0.1.0",
+  "build": 1,
+  "icon": "assets/icon.png",
+  "appearance": "system",
+  "theme": "theme.json",
+  "rust": ".",
+  "root": "App",
+  "window": {
+    "title": "AI-Network-Protection",
+    "width": 1180,
+    "height": 760,
+    "minWidth": 880,
+    "minHeight": 600
+  }
+}
