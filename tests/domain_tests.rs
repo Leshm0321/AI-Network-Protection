@@ -762,6 +762,27 @@ fn zero_key_multi_source_purity_dnsbl_cidr_edns_and_privacy_masking() {
     };
     assert_eq!(evaluate_dns_leak(&ecs_facts, 80).state, CheckState::Warn);
 
+    // 5b. Custom Clash fake-ip-range 28.0.0.1/8 & System Proxy remote DNS pass without false positive
+    assert!(is_fake_ip("28.0.0.42"));
+    assert!(is_fake_ip("28.12.34.56"));
+    let custom_fakeip = DnsProbeFacts {
+        system_claude_ips: vec!["28.0.1.15".to_owned()],
+        exit_country: Some("US".to_owned()),
+        ..Default::default()
+    };
+    assert_eq!(evaluate_dns_leak(&custom_fakeip, 40).state, CheckState::Ok);
+
+    let proxy_remote_dns = DnsProbeFacts {
+        exit_country: Some("US".to_owned()),
+        egress_resolver_ip: Some("223.5.5.5".to_owned()),
+        egress_resolver_country: Some("CN".to_owned()),
+        edns_resolver_ip: Some("1.1.1.1".to_owned()),
+        edns_resolver_geo: Some("United States - Cloudflare".to_owned()),
+        using_http_proxy: true,
+        ..Default::default()
+    };
+    assert_eq!(evaluate_dns_leak(&proxy_remote_dns, 50).state, CheckState::Ok);
+
     // 6. Privacy IP masking preserves LAN/Fake-IP while masking public IPs
     let masked = mask_ips_in_text("出口 154.36.129.181 网关 192.168.0.1 FakeIP 198.18.9.238 v6 2001:4860:4860::8888");
     assert!(masked.contains("154.36.*.*"));

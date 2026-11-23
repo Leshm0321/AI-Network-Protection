@@ -318,6 +318,7 @@ pub async fn run_all_checks_streaming(
             &sys.dns_servers,
             exit_country,
             opts.expected_country.as_deref(),
+            using_http_proxy,
         ),
         ipv6_leak::run_ipv6_leak_check(&sys.ipv6, exit_country),
         webrtc_leak::run_webrtc_check(

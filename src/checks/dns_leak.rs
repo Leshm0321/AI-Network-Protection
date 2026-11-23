@@ -24,15 +24,18 @@ const CHINA_PUBLIC_DNS: &[&str] = &[
 
 pub fn is_tunnel_dns(addr: &str) -> bool {
     let a = addr.trim().to_ascii_lowercase();
-    a == "198.18.0.2" || a == "fdfe:dcba:9876::2"
+    matches!(
+        a.as_str(),
+        "198.18.0.2" | "198.18.0.1" | "28.0.0.2" | "28.0.0.1" | "fdfe:dcba:9876::2"
+    )
 }
 
 pub fn is_fake_ip(addr: &str) -> bool {
     let a = addr.trim().to_ascii_lowercase();
     if let Ok(IpAddr::V4(v4)) = a.parse::<IpAddr>() {
-        // RFC 2544 / Mihomo fake-ip range 198.18.0.0/15
+        // RFC 2544 / Mihomo default fake-ip range 198.18.0.0/15, plus common custom Clash fake-ip range 28.0.0.0/8
         let octets = v4.octets();
-        return octets[0] == 198 && (octets[1] == 18 || octets[1] == 19);
+        return (octets[0] == 198 && (octets[1] == 18 || octets[1] == 19)) || octets[0] == 28;
     }
     a.starts_with("fdfe:dcba:9876:")
 }
@@ -200,6 +203,8 @@ pub struct DnsProbeFacts {
     pub ecs_geo: Option<String>,
     /// Domestic site observed IP (used to distinguish Wi-Fi soft-router split routing from leaks).
     pub domestic_exit_ip: Option<String>,
+    /// Whether HTTP/SOCKS proxy mode is active (browser/client traffic sends domain names to proxy for remote DNS).
+    pub using_http_proxy: bool,
 }
 
 fn geo_text_is_cn(geo: Option<&str>) -> bool {
@@ -371,6 +376,26 @@ pub fn evaluate_dns_leak(facts: &DnsProbeFacts, duration_ms: u64) -> CheckItem {
         .with_duration(duration_ms);
     }
 
+    // Case 2b: System HTTP/SOCKS proxy mode where proxied EDNS probe resolves cleanly overseas without CN ECS leak
+    let edns_overseas_ok = facts.edns_resolver_ip.is_some()
+        && facts.edns_resolver_geo.is_some()
+        && !geo_text_is_cn(facts.edns_resolver_geo.as_deref());
+    if facts.using_http_proxy && edns_overseas_ok {
+        return CheckItem::new(
+            "dns",
+            CheckCategory::NetworkLeak,
+            "DNS 泄漏检测",
+            CheckState::Ok,
+            format!(
+                "代理链路远程 DNS 解析正常（出口解析器: {} · {}，未透传大陆 ECS）",
+                facts.edns_resolver_ip.as_deref().unwrap_or("-"),
+                facts.edns_resolver_geo.as_deref().unwrap_or("海外")
+            ),
+        )
+        .with_details(details)
+        .with_duration(duration_ms);
+    }
+
     // Case 3: Authoritative DNS egress is in China while HTTP exit is overseas
     if resolver_is_cn && exit_is_overseas {
         let is_domestic_public = facts
@@ -490,6 +515,7 @@ pub async fn run_dns_leak_check(
     nic_entries: &[DnsServerEntry],
     exit_country: Option<&str>,
     expected_country: Option<&str>,
+    using_http_proxy: bool,
 ) -> CheckItem {
     let start = Instant::now();
 
@@ -679,6 +705,7 @@ pub async fn run_dns_leak_check(
         ecs_subnet,
         ecs_geo,
         domestic_exit_ip,
+        using_http_proxy,
     };
 
     evaluate_dns_leak(&facts, start.elapsed().as_millis() as u64)
